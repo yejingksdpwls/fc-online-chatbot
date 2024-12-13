@@ -155,7 +155,7 @@ class Assistant:
 
 **동작:**  
   - `action`: `"additional_input"`  
-  - `search_keyword`: 선수 이름
+  - `search_keyword`: 선수 이름 (반드시 입력 내에 있는 이름과 완전히 동일해야함)
 
 ---
 
@@ -184,9 +184,9 @@ class Assistant:
 ## 질의 분석 예시
 
 ### 질의:
-1. "게임 내 로날드 쿠만 경기 평균 스탯 알려줘."
+1. "게임 내 로날트 쿠만 경기 평균 스탯 알려줘."
    - **action:** `"additional_input"`
-   - **search_keyword:** `"로날드 쿠만"`
+   - **search_keyword:** `"로날트 쿠만"`
 
 2. "FC Online 메시 활용법 영상 추천해줘."
    - **action:** `"search_video"`
@@ -241,8 +241,22 @@ class Assistant:
             last=self.output_parser
         )
 
+    def search_stat(self, query: str, season_id, match, seasonid_data, match_data):
 
-    def search_stat(self, query: str, season_id, match):
+        season_id = next(
+            (season["seasonId"] for season in seasonid_data if season["className"]
+            == season_id),
+            None
+        )
+
+        match = next(
+            (matchs["matchtype"] for matchs in match_data if matchs["desc"]
+            == match),
+            None
+        )
+
+        # 폼 제출 후 선택된 시즌 ID와 매치 타입 출력(디버깅)
+        print(f"선택된 시즌 ID: {season_id}, 매치 타입: {match}")
 
         # 추가 작업 (예: API 요청)
         # GET 요청으로 JSON 데이터 가져오기(포지션 데이터)
@@ -259,11 +273,16 @@ class Assistant:
         found_player = False  # 선수 정보 찾았는지 여부를 추적할 변수
 
         cumulative_result = {}
-        not_position = []
+        n = 0
 
         for i in range(0, len(spid_data)):
-            if query == spid_data[i]['name'] and season_id == str(spid_data[i]['id'])[:3]:
+            if query == spid_data[i]['name'] and season_id == int(str(spid_data[i]['id'])[:3]):
                 id = spid_data[i]['id']
+                n += 1
+
+        if n == 0:
+            return '❎ 입력하신 정보에 일치하는 선수를 찾을 수 없습니다.'
+        
 
         for i in range(0, len(position_data)):  # 모든 포지션에 대해 반복
             position = position_data[i]['spposition']
@@ -271,6 +290,7 @@ class Assistant:
 
             # JSON 배열을 문자열로 변환
             player_string = json.dumps(player_array)
+            print(player_string)
 
             # 요청 헤더
             headers = {
@@ -287,103 +307,94 @@ class Assistant:
 
             # 결과 확인
             if response.status_code == 200:
-                found_player = True  # 선수를 찾았다고 표시
-                response = response.json()
-                status = response.get("status", {})
-                match_count = status.get("matchCount")
+                try:
+                    found_player = True  # 선수를 찾았다고 표시
+                    status_data = response.json()
 
-                for key, value in status.items():
-                    if isinstance(value, (int, float)) and key != 'matchCount':
-                        cumulative_result[key] = cumulative_result.get(key, 0) + (value * match_count)
-                    else:
-                        cumulative_result[key] = cumulative_result.get(key, 0) + (match_count)
-            else:
-                not_position.append(position)
+                    status = status_data[0]['status']
+                    match_count = status["matchCount"]
+
+                    for key, value in status.items():
+                        if isinstance(value, (int, float)) and key != 'matchCount':
+                            cumulative_result[key] = cumulative_result.get(key, 0) + (value * match_count)
+                        else:
+                            cumulative_result[key] = cumulative_result.get(key, 0) + (match_count)
+                except:
+                    found_player = False
+
+        for key, value in cumulative_result.items():
+            if isinstance(value, (int, float)) and key != 'matchCount':
+                cumulative_result[key] /= cumulative_result['matchCount']
 
         if not found_player:
-            st.write('❎ 입력하신 정보에 일치하는 선수를 찾을 수 없습니다.')
-        else:
-            if position:
-                message = f"{', '.join(position)}의 포지션에 데이터가 없습니다"
-                st.write(message)
+            return '❎ 입력하신 정보에 일치하는 선수를 찾을 수 없습니다.'
 
-            # 그래프 시각화
-            # 키와 값 분리
-            status_data = cumulative_result
-            keys = ['슛', '유효슛', '어시스트', '골', '드리블', '드리블 시도', '드리블 성공', '패스 시도', '패스 성공', '블록', '태클', '경기수']
-            values = list(status_data.values())
+        # 그래프 시각화
+        # 키와 값 분리
+        print(cumulative_result.values())
+        status_data = cumulative_result
+        keys = ['슛', '유효슛', '어시스트', '골', '드리블', '드리블 시도', '드리블 성공', '패스 시도', '패스 성공', '블록', '태클', '경기수']
+        values = list(status_data.values())
 
-            # 한글 폰트 설정 (Windows에서 Malgun Gothic 사용)
-            rc('font', family='Malgun Gothic')
+        # 한글 폰트 설정 (Windows에서 Malgun Gothic 사용)
+        rc('font', family='Malgun Gothic')
 
-            # 막대 그래프 그리기
-            fig, ax = plt.subplots(figsize=(10, 6))
-            bars = ax.bar(keys, values, color='skyblue')
+        # 막대 그래프 그리기
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bars = ax.bar(keys, values, color='skyblue')
 
-            # 각 막대 위에 값 표시
-            ax.bar_label(bars, padding=5)
+        # 각 막대 위에 값 표시
+        ax.bar_label(bars, padding=5)
 
-            # 그래프 꾸미기
-            plt.title("선수 평균 통계", fontsize=16)
-            plt.xlabel("카테고리", fontsize=12)
-            plt.ylabel("값", fontsize=12)
-            plt.xticks(rotation=45, ha='right')  # X축 라벨 회전
-            plt.tight_layout()
+        # 그래프 꾸미기
+        plt.title("선수 평균 통계", fontsize=16)
+        plt.xlabel("카테고리", fontsize=12)
+        plt.ylabel("값", fontsize=12)
+        plt.xticks(rotation=45, ha='right')  # X축 라벨 회전
+        plt.tight_layout()
 
-            return fig
+        return fig
         
-    def input_(self):
+    def season_input_(self, seasonid_data):
+
+        season_options = [season["className"] for season in seasonid_data if season["className"]]  # 빈 값 제거
+
+        # 폼 제출 후 선택된 값을 session_state에 저장
+        st.session_state.selected_season = st.selectbox("시즌을 선택하세요:", season_options, None, key='season')
+
+        if st.session_state.selected_season != None:
+            return True
+
+    
+    def match_input_(self, match_data):
+
+        match_options = [match["desc"] for match in match_data if match["desc"]]  # 빈 값 제거
+
+        st.session_state.selected_match = st.selectbox("매치를 선택하세요:", match_options, None, key='match')
+
+        if st.session_state.selected_match != None:
+            return True
+
+
+    def additional_input(self, keyword: str, seasonid_data, match_data):
+
         # 상태 초기화
         if "selected_season" not in st.session_state:
             st.session_state.selected_season = None
         if "selected_match" not in st.session_state:
             st.session_state.selected_match = None
 
-        # GET 요청으로 JSON 데이터 가져오기(시즌 id 데이터)
-        response = requests.get(self.seasonid_url)
-        response.raise_for_status()  # 요청 실패 시 예외 발생
-        seasonid_data = response.json()  # JSON 데이터를 파싱
+        # 시즌과 매치 선택
+        self.season_input_(seasonid_data)
+        if st.session_state.selected_season:
+            self.match_input_(match_data)
+            if st.session_state.selected_match:
+                if st.button("결과 확인"):
+                    # 새로운 값을 기반으로 search_stat 호출 (return 없이)
+                    result = self.search_stat(keyword, st.session_state.selected_season, st.session_state.selected_match, seasonid_data, match_data)
 
-        # GET 요청으로 JSON 데이터 가져오기(매치 데이터)
-        response = requests.get(self.match_url)
-        response.raise_for_status()  # 요청 실패 시 예외 발생
-        match_data = response.json()  # JSON 데이터를 파싱
-
-        # 입력 위젯을 폼 안에 배치
-        with st.form(key="input_form"):
-            season_options = [season["className"] for season in seasonid_data if season["className"]]  # 빈 값 제거
-            match_options = [match["desc"] for match in match_data if match["desc"]]  # 빈 값 제거
-
-            # 선택 박스 (기본값 설정)
-            selected_season = st.selectbox(
-                "시즌을 선택하세요:", season_options, None)
-            selected_match = st.selectbox("매치를 선택하세요:", match_options, None)
-
-            # 폼 제출 후 선택된 값을 session_state에 저장
-            st.session_state.selected_season = selected_season
-            st.session_state.selected_match = selected_match
-
-            # 폼 제출 후 처리
-            submit_button = st.form_submit_button("입력")
-
-            if submit_button:
-                return True  # 값이 입력되었으므로 True 반환
-
-        return False  # 폼 제출되지 않으면 False 반환
-
-    def additional_input(self, keyword: str):
-        # 입력 폼 처리
-        if self.input_():
-
-            # 폼 제출 후 선택된 시즌 ID와 매치 타입 출력(디버깅)
-            print(f"선택된 시즌 ID: {st.session_state.selected_season}, 매치 타입: {st.session_state.selected_match}")
-
-            # 새로운 값을 기반으로 search_stat 호출 (return 없이)
-            result = self.search_stat(
-                keyword, st.session_state.selected_season, st.session_state.selected_match)
-
-            # 결과 출력
-            return result
+                    # 결과 출력
+                    return result
 
     
     def search_videos(self, query: str, max_results: int = 5):
@@ -492,7 +503,7 @@ class Assistant:
 
             # FC Online 관련 질의인 경우 분기 처리
             if action == "additional_input":
-                return action, self.additional_input(search_keyword)
+                return action, search_keyword
             elif action == "search_video":
                 return action, self.search_videos(search_keyword)
 
@@ -500,12 +511,13 @@ class Assistant:
             st.error(f"처리 중 오류 발생: {e}")
             return f"처리 중 오류 발생: {e}"
 
+def main_():
+    if "action" not in st.session_state:
+            st.session_state.action = None
+    if "keyword" not in st.session_state:
+            st.session_state.keyword = None
 
-
-def main():
     st.title("FC Online Chat Bot")
-
-
     try:
         # streamlit 실행
         # 세션 상태 초기화
@@ -521,11 +533,13 @@ def main():
             assistant = Assistant.from_env()
             if assistant.process_query(query):
                 action, response = assistant.process_query(query)
+                st.session_state.action = action
+                st.session_state.keyword = response
                 if action == 'search_video':
                     # 챗봇의 응답을 기록
                     st.session_state.messages.append(
                         {"role": "assistant", "video": response})
-                else:
+                elif action == 'not_supported_message':
                     # 챗봇의 응답을 기록
                     st.session_state.messages.append(
                         {"role": "assistant", "content": response})
@@ -552,12 +566,47 @@ def main():
                             st.write(f"⛓️ [유튜브 링크]({video['url']})")
 
                         st.write("---")  # 구분선 추가
+
+                elif 'plot' in msg:
+                    st.pyplot(msg['plot'])
+                    st.write(f"**⚽ 선택된 시즌 ID**: {msg['season']}")
+                    st.write(f"**🥅 매치 타입**: {msg['match']}")
+
                 else:
                     st.write(msg["content"])
 
-
     except Exception as e:
         print(f"오류 발생: {e}")
+
+def main__(keyword):
+    assistant = Assistant.from_env()  # 인스턴스를 생성
+
+    # GET 요청으로 JSON 데이터 가져오기(시즌 id 데이터)
+    response = requests.get(assistant.seasonid_url)
+    response.raise_for_status()  # 요청 실패 시 예외 발생
+    seasonid_data = response.json()  # JSON 데이터를 파싱
+
+    # GET 요청으로 JSON 데이터 가져오기(매치 데이터)
+    response = requests.get(assistant.match_url)
+    response.raise_for_status()  # 요청 실패 시 예외 발생
+    match_data = response.json()  # JSON 데이터를 파싱
+
+    response = assistant.additional_input(keyword, seasonid_data, match_data)  # 인스턴스를 통해 호출
+    if type(response)=='str':
+        st.write(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    elif response:
+        st.pyplot(response)
+        st.write(f"**⚽ 선택된 시즌 ID**: {st.session_state.selected_season}")
+        st.write(f"**🥅 매치 타입**: {st.session_state.selected_match}")
+        st.session_state.messages.append({"role": "assistant", "plot": response,
+                                        "season": st.session_state.selected_season, "match": st.session_state.selected_match})
+
+
+def main():
+    main_()
+    if st.session_state.action == 'additional_input':
+        main__(st.session_state.keyword)
 
 
 # 스크립트가 직접 실행될 때만 main() 함수 호출
