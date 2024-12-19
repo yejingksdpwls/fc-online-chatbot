@@ -45,7 +45,7 @@ class AssistantConfig:
     openai_api_key : str
     llm_model: str
     temperature: float = 0.0
-    not_supported_message: str = "죄송합니다. FC Online 게임 관련 영상만 제공할 수 있습니다."
+    not_supported_message: str = "😭 죄송합니다. FC Online 게임 관련 영상만 제공할 수 있습니다.⚽"
 
 
 class AgentAction(BaseModel):
@@ -142,7 +142,7 @@ class Assistant:
      - 선수 이름
      - 전술, 포지션, 공략, 활용법 등 게임 맥락 키워드
    - "피파"와 동반된 키워드가 없으면 **FC Online 외의 질의로 판단**.
-3. 사용자의 질문이 FC Online 게임 외 다른 분야(예: 실제 축구 경기 분석)일 경우:
+3. 사용자의 질문이 FC Online 게임 외 다른 분야(예: 실제 축구 경기 분석, 관련이 아예 없는 질문)일 경우:
    - `action`: `"not_supported"`
    - `search_keyword`: `""`
 
@@ -316,41 +316,32 @@ class Assistant:
 
                     for key, value in status.items():
                         if isinstance(value, (int, float)) and key != 'matchCount':
-                            cumulative_result[key] = cumulative_result.get(key, 0) + (value * match_count)
-                        else:
-                            cumulative_result[key] = cumulative_result.get(key, 0) + (match_count)
+                            cumulative_result.setdefault(key, []).append(value)
                 except:
                     found_player = False
-
-        for key, value in cumulative_result.items():
-            if isinstance(value, (int, float)) and key != 'matchCount':
-                cumulative_result[key] /= cumulative_result['matchCount']
 
         if not found_player:
             return '❎ 입력하신 정보에 일치하는 선수를 찾을 수 없습니다.'
 
         # 그래프 시각화
         # 키와 값 분리
-        print(cumulative_result.values())
         status_data = cumulative_result
-        keys = ['슛', '유효슛', '어시스트', '골', '드리블', '드리블 시도', '드리블 성공', '패스 시도', '패스 성공', '블록', '태클', '경기수']
+        keys = ['슛', '유효슛', '어시스트', '골', '드리블 시도', '드리블 성공', '패스 시도', '패스 성공', '블록', '태클']
         values = list(status_data.values())
+        values.pop(4)
 
         # 한글 폰트 설정 (Windows에서 Malgun Gothic 사용)
         rc('font', family='Malgun Gothic')
 
-        # 막대 그래프 그리기
+        # 박스플롯 그리기
         fig, ax = plt.subplots(figsize=(10, 6))
-        bars = ax.bar(keys, values, color='skyblue')
-
-        # 각 막대 위에 값 표시
-        ax.bar_label(bars, padding=5)
+        bars = ax.boxplot(values, labels=keys)
 
         # 그래프 꾸미기
         plt.title("선수 평균 통계", fontsize=16)
         plt.xlabel("카테고리", fontsize=12)
         plt.ylabel("값", fontsize=12)
-        plt.xticks(rotation=45, ha='right')  # X축 라벨 회전
+        # plt.xticks(rotation=45, ha='right')  # X축 라벨 회전
         plt.tight_layout()
 
         return fig
@@ -504,6 +495,7 @@ class Assistant:
             # FC Online 관련 질의인 경우 분기 처리
             if action == "additional_input":
                 return action, search_keyword
+            
             elif action == "search_video":
                 return action, self.search_videos(search_keyword)
 
@@ -516,8 +508,14 @@ def main_():
             st.session_state.action = None
     if "keyword" not in st.session_state:
             st.session_state.keyword = None
+    st.markdown(
+        """
+    <h1 style="text-align: center;">⚽</h1>
+    <h1 style="text-align: center;">🏃‍♂️‍➡️ FC Online Chat Bot 🥅</h1>
+    """,
+        unsafe_allow_html=True
+    )
 
-    st.title("FC Online Chat Bot")
     try:
         # streamlit 실행
         # 세션 상태 초기화
@@ -539,14 +537,19 @@ def main_():
                     # 챗봇의 응답을 기록
                     st.session_state.messages.append(
                         {"role": "assistant", "video": response})
-                elif action == 'not_supported_message':
+                elif action == 'not_supported':
                     # 챗봇의 응답을 기록
                     st.session_state.messages.append(
-                        {"role": "assistant", "content": response})
+                        {"role": "assistant", "content": response, "type": action})
 
         # 대화 기록 표시
+        print(st.session_state.messages)
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
+                if msg["role"] == "assistant" and msg.get("type") == "not_supported":
+                    st.write(msg["content"])
+                    st.write("---")  # 구분선 추가
+
                 if "video" in msg:
                     for video in msg['video']:
                         # 두 개의 열 생성
@@ -571,8 +574,9 @@ def main_():
                     st.pyplot(msg['plot'])
                     st.write(f"**⚽ 선택된 시즌 ID**: {msg['season']}")
                     st.write(f"**🥅 매치 타입**: {msg['match']}")
+                    st.write("---")  # 구분선 추가
 
-                else:
+                elif 'content' in msg and 'type' not in msg:  # content 키가 있는 경우
                     st.write(msg["content"])
 
     except Exception as e:
