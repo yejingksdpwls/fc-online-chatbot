@@ -19,10 +19,14 @@
 - **LLM 기반 질의 분석**  
   - `langchain_core` 라이브러리를 활용해 GPT 출력(JSON)을 **자동 파싱**  
   - **프롬프트 템플릿**(`PromptTemplate`)으로 “질의 → 분석 → 액션 결정” 경로 설정  
-- **FC Online 통계 조회**  
+- **FC Online 통계 조회**
+  ![ezgif com-speed (1)](https://github.com/user-attachments/assets/c862d655-c41d-46b5-b911-4c84ef86d7fa)
+
   - Nexon API를 사용해 특정 선수(시즌·매치 유형)의 **경기 평균 통계** 조회  
   - **Matplotlib** 박스플롯을 통해 시각화 후 **Streamlit**으로 표시  
-- **유튜브 영상 검색**  
+- **유튜브 영상 검색**
+![ezgif com-speed](https://github.com/user-attachments/assets/93845d92-0618-4c59-b69f-105b7c72d1ab)
+  
   - **YouTube Data API**로 관련 영상 검색 → **좋아요 수** 기준 정렬  
   - 상위 1~N개의 결과를 카드 형식으로 보여줌  
 - **Streamlit 기반 UI**  
