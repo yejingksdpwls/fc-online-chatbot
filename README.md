@@ -22,13 +22,13 @@
   
 - **FC Online 통계 조회**
 
-  ![ezgif com-speed (1)](https://github.com/user-attachments/assets/c862d655-c41d-46b5-b911-4c84ef86d7fa)
+![ezgif com-crop](https://github.com/user-attachments/assets/ffe3e8de-affe-4dfc-a5a9-6dd96fbbf410)
 
   - Nexon API를 사용해 특정 선수(시즌·매치 유형)의 **경기 평균 통계** 조회  
   - **Matplotlib** 박스플롯을 통해 시각화 후 **Streamlit**으로 표시  
 - **유튜브 영상 검색**
   
-![ezgif com-crop](https://github.com/user-attachments/assets/ffe3e8de-affe-4dfc-a5a9-6dd96fbbf410)
+![418001631-93845d92-0618-4c59-b69f-105b7c72d1ab-ezgif com-crop](https://github.com/user-attachments/assets/6c0b358e-1cfc-4aed-b2a6-67e840d01295)
   
   - **YouTube Data API**로 관련 영상 검색 → **좋아요 수** 기준 정렬  
   - 상위 1~N개의 결과를 카드 형식으로 보여줌  
