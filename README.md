@@ -60,3 +60,65 @@
    API_KEY=YOUR_NEXON_KEY
    OPENAI_MODEL=gpt-4
    TEMPERATURE=0.0
+
+---
+
+## 🏃 Interact
+- 웹 브라우저에서 `localhost:8501` 접속
+- 입력창에 챗 메시지 (“메시 평균 스탯 알려줘” 등) 입력
+- 시즌/매치 타입 선택 후 통계 그래프 확인 가능
+
+---
+
+## 🏗 Code Explanation
+
+### 1. Environment & Config
+- `.env` 파일에서 API KEY 로드
+- `AssistantConfig`로 **LLM** 설정(모델·온도 등)
+
+### 2. LLM & Prompt
+- **PromptTemplate:**
+   - GPT에게 질의 형식·분석 규칙 전달
+- **RunnableSequence:**
+   - (프롬프트 → LLM → 파서) 순서로 실행, GPT의 출력(JSON)을 자동 파싱
+
+### 3. Action Parsing
+- **JsonOutputParser + AgentAction (Pydantic)**
+   - GPT가 `"search_video"`, `"additional_input"`, `"not_supported"` 중 하나를 **action**으로 응답
+   - `search_keyword` 역시 자동 추출
+
+### 4. Search Logic
+- **search_videos**
+   - 유튜브 검색 API → **좋아요 수** 기준 정렬 후 결과 반환
+- **search_stat**
+   - Nexon API로 특정 **선수 ID** 조회
+   - 경기 스탯(슛, 골, 패스 등) 누적
+   - **Matplotlib** 박스플롯 시각화
+
+### 5. Streamlit Flow
+- main_()
+   - 채팅 입력 후 → `process_query` 호출
+   - GPT가 결정한 `action`을 **세션**에 저장
+- main__()
+   - `action == "additional_input"` 시 **시즌/매치** 선택 폼 표시
+   - 선택 값에 따라 search_stat를 불러와 통계 그래프 표시
+- main()
+   - `main_()` + `main__()` 합쳐 **2단계 입력** 흐름 완성
+
+---
+
+## 🧩 Trouble Shooting
+
+### 문제 요약
+- Streamlit에서 사용자가 입력할 때마다 새로고침이 발생
+  → 세션 정보가 초기화되어 추가 입력 단계로 못 넘어가는 문제
+
+### 해결 과정
+1. 하나의 `main` 함수에서 전부 처리 시,
+   - 새로고침 → 이전 action 사라짐
+2. **함수 분할**
+   - `main_()` = 챗 입력으로 `action` 결정
+   - `main__()` = `action == "additional_input"` → **시즌/매치** 입력 + **선수 통계** 조회
+3. st.session_state 활용
+   - 이전 state(액션·키워드) 유지
+   - 2단계 입력(챗 → 세부 정보) 원활히 진행
